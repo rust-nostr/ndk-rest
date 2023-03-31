@@ -11,7 +11,7 @@
 
 # Enable permissive CORS (default: false)
 # Permissive mode should NOT be used in production!
-# permissive_cors = false
+permissive_cors = true
 
 [limit]
 # Max filters that can be sent to /events endpoint (default: 10)
@@ -21,7 +21,7 @@
 # max_events_per_filter = 100
 
 [nostr]
-relays = ["ws://192.168.7.233:7777"]
+relays = ["wss://relay.rip"]
 
 [redis]
 # Enable redis (default: false)

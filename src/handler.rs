@@ -2,9 +2,12 @@
 // Distributed under the MIT software license
 
 use actix_web::{get, post, web, HttpResponse};
+use nostr::prelude::FromBech32;
 use nostr_sdk::hashes::sha256::Hash as Sha256Hash;
 use nostr_sdk::hashes::Hash;
-use nostr_sdk::{Event, Filter};
+use nostr_sdk::prelude::FromPkStr;
+use nostr_sdk::prelude::XOnlyPublicKey;
+use nostr_sdk::{Client, Event, Filter, Keys, Kind, Url};
 use redis::AsyncCommands;
 use serde_json::json;
 
@@ -36,6 +39,78 @@ pub async fn publish_event(data: web::Data<AppState>, body: web::Json<Event>) ->
             "success": true,
             "message": "Event published",
             "data": {},
+        })),
+        Err(e) => HttpResponse::BadRequest().json(json!({
+            "success": false,
+            "message": e.to_string(),
+            "data": {},
+        })),
+    }
+}
+
+#[get("/v1/{relay}/{pubkey}/contacts")]
+pub async fn get_contacts(
+    _data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+) -> HttpResponse {
+    let (relay, pubkey) = path.into_inner();
+
+    let keys = Keys::from_pk_str(pubkey.as_str()).unwrap();
+    // let opts = Options::new().wait_for_send(true);
+    // let endpoint = Url::parse(&relay).unwrap();
+    let client = Client::new(&keys);
+
+    client.add_relay(relay, None).await.unwrap();
+    client.connect().await;
+
+    // println!("pubkey: {}", pubkey);
+    // let pk: XOnlyPublicKey = XOnlyPublicKey::from_bech32(pubkey).unwrap();
+
+    match client.get_contact_list_metadata(None).await {
+        Ok(contacts) => HttpResponse::Ok().json(json!({
+            "success": true,
+            "message": format!("Got {} events", contacts.len()),
+            "data": contacts,
+        })),
+        Err(e) => HttpResponse::BadRequest().json(json!({
+            "success": false,
+            "message": e.to_string(),
+            "data": {},
+        })),
+    }
+}
+
+#[get("/profile/{relay}/{pubkey}")]
+pub async fn get_profile(
+    _data: web::Data<AppState>,
+    path: web::Path<(String, String)>,
+) -> HttpResponse {
+    let (relay, pubkey) = path.into_inner();
+
+    let keys = Keys::generate();
+    // let opts = Options::new().wait_for_send(true);
+    let client = Client::new(&keys); //, opts);
+
+    client.add_relay(relay, None).await.unwrap();
+
+    client.connect().await;
+
+    println!("pubkey: {}", pubkey);
+    let pk: XOnlyPublicKey = XOnlyPublicKey::from_bech32(pubkey).unwrap();
+
+    let filter = Filter::new()
+        .authors(vec![pk])
+        .kind(Kind::Metadata)
+        .limit(1);
+
+    let mut filters: Vec<Filter> = Vec::new();
+    filters.push(filter);
+
+    match client.get_events_of(filters, None).await {
+        Ok(events) => HttpResponse::Ok().json(json!({
+            "success": true,
+            "message": format!("Got {} events", events.len()),
+            "data": events,
         })),
         Err(e) => HttpResponse::BadRequest().json(json!({
             "success": false,

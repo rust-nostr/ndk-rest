@@ -90,4 +90,6 @@ fn init_routes(cfg: &mut web::ServiceConfig) {
     cfg.service(handler::ping);
     cfg.service(handler::publish_event);
     cfg.service(handler::get_events);
+    cfg.service(handler::get_profile);
+    cfg.service(handler::get_contacts);
 }
